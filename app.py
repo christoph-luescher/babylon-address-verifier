@@ -197,12 +197,22 @@ HTML_TEMPLATE = """
         <form id="verifierForm">
             <div class="form-group">
                 <label for="stakerPubkey">Staker Public Key *</label>
+                <p style="font-size: 12px; color: #666; margin: 5px 0 10px 0; line-height: 1.4;">
+                    To obtain your public key, connect your wallet to the 
+                    <a href="https://btcstaking.babylonlabs.io/" target="_blank" style="color: #007bff; text-decoration: none;">Babylon staking app</a>. 
+                    The key will be displayed in the wallet drop-down that becomes accessible top right after you successfully connected.
+                </p>
                 <input type="text" id="stakerPubkey" name="stakerPubkey" 
                        placeholder="Hex string (33-byte compressed or 32-byte x-only)" required>
             </div>
 
             <div class="form-group">
                 <label for="finalityProviders">Finality Providers *</label>
+                <p style="font-size: 12px; color: #666; margin: 5px 0 10px 0; line-height: 1.4;">
+                    Finality provider keys can be found in the 
+                    <a href="https://github.com/babylonlabs-io/networks/tree/main/bbn-1/finality-providers/registry" target="_blank" style="color: #007bff; text-decoration: none;">registry</a>. 
+                    Bitcoin Suisse is prefilled.
+                </p>
                 <textarea id="finalityProviders" name="finalityProviders" rows="3"
                           placeholder="Comma-separated hex strings" required></textarea>
             </div>
