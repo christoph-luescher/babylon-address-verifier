@@ -163,7 +163,6 @@ HTML_TEMPLATE = """
             <strong>Example values:</strong><br>
             Staker PubKey: <code>8a762ca4ab2a314e79dbf0e81ed5efa2483f0f52664a4da42ea125b7ed98f4b1</code><br>
             Finality Providers: <code>be2f7942c5dfaa826aec61355ef427fad1095491aa04850c450f812f9b9ca9ed</code><br>
-            Block: <code>903538</code>
         </div>
 
         <form id="verifierForm">
