@@ -422,34 +422,159 @@ def load_mainnet_params_from_api(block_height: Optional[int], api_url: str) -> t
     }
     return cov_pks, cov_quorum, max_stake, unbond_blocks, meta
 
+
+
 # ------------------------------------------------------------------------------
-# Validation
+# Compute staking address for CLI and web
 # ------------------------------------------------------------------------------
-def verify_address_parameters(args) -> List[str]:
-    errors = []
-
-    # keys
+def compute_babylon_address(
+    staker_pubkey: str,
+    finality_providers: str,
+    network: str = "mainnet",
+    block: Optional[int] = None,
+    api_url: str = DEFAULT_API_URL,
+    covenant_pubkeys: Optional[str] = None,
+    covenant_threshold: Optional[int] = None,
+    timelock: Optional[int] = None,
+    unbonding_time: Optional[int] = None,
+    debug: bool = False
+) -> dict:
+    """
+    Core function to compute Babylon staking address.
+    Returns a dictionary with address, debug info, and any errors.
+    
+    Args:
+        staker_pubkey: Hex string of staker public key
+        finality_providers: Comma-separated hex strings of FP public keys
+        network: "mainnet", "testnet", or "signet"
+        block: Bitcoin block height for parameter selection
+        api_url: URL for Babylon network info API
+        covenant_pubkeys: Optional override for covenant keys
+        covenant_threshold: Optional override for covenant threshold
+        timelock: Optional override for timelock blocks
+        unbonding_time: Optional override for unbonding time
+        debug: Whether to include debug information
+    
+    Returns:
+        dict: {
+            "success": bool,
+            "address": str (if success),
+            "pkscript_hex": str (if success),
+            "debug": dict (if debug=True and success),
+            "error": str (if not success),
+            "api_meta": dict (if mainnet API was used)
+        }
+    """
     try:
-        parse_pubkey(args.staker_pubkey)
+        # Validate basic inputs
+        validation_errors = []
+        
+        # Parse keys to validate format
+        try:
+            staker_pk = parse_pubkey(staker_pubkey)
+            fp_pubkeys = [parse_pubkey(pk.strip()) for pk in finality_providers.split(",")]
+            if not fp_pubkeys:
+                validation_errors.append("At least one finality provider public key is required")
+        except Exception as e:
+            validation_errors.append(f"Invalid public key format: {e}")
+        
+        # Validate numeric parameters
+        if timelock is not None and timelock <= 0:
+            validation_errors.append("Timelock must be positive")
+        if unbonding_time is not None and unbonding_time <= 0:
+            validation_errors.append("Unbonding time must be positive")
+        if covenant_threshold is not None and covenant_threshold <= 0:
+            validation_errors.append("Covenant threshold must be positive")
+            
+        if validation_errors:
+            return {
+                "success": False,
+                "error": "; ".join(validation_errors)
+            }
+        
+        # Select network parameters
+        if network == "mainnet":
+            SelectParams("mainnet")
+        else:
+            SelectParams("testnet")
+        
+        # Resolve parameters for covenant & timings
+        used_api = False
+        api_meta = {}
+        
+        if network == "mainnet":
+            need_cov = not covenant_pubkeys or covenant_threshold is None
+            need_time = timelock is None or unbonding_time is None
+            
+            if need_cov or need_time:
+                try:
+                    cov_pks, cov_thr, api_timelock, api_unbond, meta = load_mainnet_params_from_api(block, api_url)
+                    used_api = True
+                    api_meta = meta
+                except Exception as e:
+                    return {
+                        "success": False,
+                        "error": f"Failed to load mainnet params from API: {e}"
+                    }
+            
+            # Use provided values or API defaults
+            if covenant_pubkeys:
+                covenant_pubkeys_list = [parse_pubkey(pk.strip()) for pk in covenant_pubkeys.split(",")]
+            else:
+                covenant_pubkeys_list = [parse_pubkey(pk.strip()) for pk in cov_pks]
+            covenant_threshold_val = covenant_threshold if covenant_threshold is not None else cov_thr
+            timelock_blocks = timelock if timelock is not None else api_timelock
+            unbonding_time_val = unbonding_time if unbonding_time is not None else api_unbond
+            
+        else:
+            # Non-mainnet: require all parameters
+            if not covenant_pubkeys or covenant_threshold is None or timelock is None or unbonding_time is None:
+                return {
+                    "success": False,
+                    "error": "For testnet/signet, must provide covenant_pubkeys, covenant_threshold, timelock, and unbonding_time"
+                }
+            covenant_pubkeys_list = [parse_pubkey(pk.strip()) for pk in covenant_pubkeys.split(",")]
+            covenant_threshold_val = covenant_threshold
+            timelock_blocks = timelock
+            unbonding_time_val = unbonding_time
+        
+        # Final validation
+        if len(covenant_pubkeys_list) < covenant_threshold_val:
+            return {
+                "success": False,
+                "error": "Covenant threshold exceeds number of covenant keys"
+            }
+        
+        # Compute the address
+        address, pkscript, debug_info = compute_taproot_address_and_pkscript(
+            staker_pubkey=staker_pk,
+            finality_provider_pubkeys=fp_pubkeys,
+            covenant_pubkeys=covenant_pubkeys_list,
+            covenant_threshold=covenant_threshold_val,
+            timelock_blocks=timelock_blocks,
+            unbonding_time=unbonding_time_val,
+            network=network,
+        )
+        
+        result = {
+            "success": True,
+            "address": address,
+            "pkscript_hex": pkscript.hex(),
+        }
+        
+        if debug:
+            result["debug"] = debug_info
+            
+        if used_api:
+            result["api_meta"] = api_meta
+            
+        return result
+        
     except Exception as e:
-        errors.append(f"Invalid staker public key: {e}")
-
-    try:
-        fps = [parse_pubkey(pk.strip()) for pk in args.finality_providers.split(",")]
-        if not fps:
-            errors.append("At least one finality provider public key is required")
-    except Exception as e:
-        errors.append(f"Invalid finality provider public key: {e}")
-
-    # numbers (only if provided)
-    if args.timelock is not None and args.timelock <= 0:
-        errors.append("Timelock must be positive")
-    if args.unbonding_time is not None and args.unbonding_time <= 0:
-        errors.append("Unbonding time must be positive")
-    if args.covenant_threshold is not None and args.covenant_threshold <= 0:
-        errors.append("Covenant threshold must be positive")
-
-    return errors
+        return {
+            "success": False,
+            "error": f"Computation error: {e}"
+        }
 
 # ------------------------------------------------------------------------------
 # CLI
@@ -475,69 +600,22 @@ def main():
 
     args = parser.parse_args()
 
-    # Validate basic inputs
-    errs = verify_address_parameters(args)
-    if errs:
-        print("❌ Parameter validation errors:")
-        for e in errs:
-            print("  -", e)
-        sys.exit(1)
+    # Use the refactored computation function
+    result = compute_babylon_address(
+        staker_pubkey=args.staker_pubkey,
+        finality_providers=args.finality_providers,
+        network=args.network,
+        block=args.block,
+        api_url=args.api_url,
+        covenant_pubkeys=args.covenant_pubkeys,
+        covenant_threshold=args.covenant_threshold,
+        timelock=args.timelock,
+        unbonding_time=args.unbonding_time,
+        debug=args.debug
+    )
 
-    # Select network (python-bitcoinlib)
-    if args.network == "mainnet":
-        SelectParams("mainnet")
-    else:
-        # python-bitcoinlib uses 'testnet' params for both testnet and signet address HRP='tb'
-        SelectParams("testnet")
-
-    # Parse keys
-    try:
-        staker_pk = parse_pubkey(args.staker_pubkey)
-        fp_pubkeys = [parse_pubkey(pk.strip()) for pk in args.finality_providers.split(",")]
-    except Exception as e:
-        print(f"❌ Error parsing keys: {e}")
-        sys.exit(1)
-
-    # Resolve parameters for covenant & timings
-    used_api = False
-    api_meta = {}
-    if args.network == "mainnet":
-        need_cov = not args.covenant_pubkeys or args.covenant_threshold is None
-        need_time = args.timelock is None or args.unbonding_time is None
-
-        if need_cov or need_time:
-            try:
-                cov_pks, cov_thr, api_timelock, api_unbond, meta = load_mainnet_params_from_api(args.block, args.api_url)
-                used_api = True
-                api_meta = meta
-            except Exception as e:
-                print(f"❌ Failed to load mainnet params from API: {e}")
-                sys.exit(1)
-
-        # Covenant keys / threshold
-        if args.covenant_pubkeys:
-            covenant_pubkeys = [parse_pubkey(pk.strip()) for pk in args.covenant_pubkeys.split(",")]
-        else:
-            covenant_pubkeys = [parse_pubkey(pk.strip()) for pk in cov_pks]
-        covenant_threshold = args.covenant_threshold if args.covenant_threshold is not None else cov_thr
-
-        # Timelock / unbonding
-        timelock_blocks = args.timelock if args.timelock is not None else api_timelock
-        unbonding_time = args.unbonding_time if args.unbonding_time is not None else api_unbond
-
-    else:
-        # Non-mainnet: require user to pass everything explicitly
-        if not args.covenant_pubkeys or args.covenant_threshold is None or args.timelock is None or args.unbonding_time is None:
-            print("❌ For --network testnet/signet, provide --covenant-pubkeys, --covenant-threshold, --timelock, and --unbonding-time.")
-            sys.exit(1)
-        covenant_pubkeys = [parse_pubkey(pk.strip()) for pk in args.covenant_pubkeys.split(",")]
-        covenant_threshold = args.covenant_threshold
-        timelock_blocks = args.timelock
-        unbonding_time = args.unbonding_time
-
-    # Final validation on counts
-    if len(covenant_pubkeys) < covenant_threshold:
-        print("❌ Covenant threshold exceeds number of covenant keys.")
+    if not result["success"]:
+        print(f"{result['error']}")
         sys.exit(1)
 
     # Display summary
@@ -548,43 +626,16 @@ def main():
     print(f"Network: {args.network}")
     print(f"Staker PubKey: {args.staker_pubkey}")
     print(f"Finality Providers: {args.finality_providers}")
-    if args.network == "mainnet" and used_api:
-        bh_info = f"{args.block}" if args.block is not None else "latest"
-        print(f"Mainnet parameter set via API /v2/network-info @ block={bh_info}")
-        print(f"  - btc_activation_height: {api_meta.get('btc_activation_height')}")
-        print(f"  - timelock: {api_timelock}")
-        print(f"  - unbonding time: {api_unbond}")
-        print(f"  - covenant keys: {len(cov_pks)}")
-        print(f"  - covenant threshold: {cov_thr}")
-    else:
-        print(f"Covenant Committee: {len(covenant_pubkeys)} keys (threshold: {covenant_threshold})")
-        print(f"Timelock (staking period): {timelock_blocks} blocks")
-        print(f"Unbonding Time: {unbonding_time} blocks")
     print()
-
-    # Compute
-    try:
-        address, pkscript, debug = compute_taproot_address_and_pkscript(
-            staker_pubkey=staker_pk,
-            finality_provider_pubkeys=fp_pubkeys,
-            covenant_pubkeys=covenant_pubkeys,
-            covenant_threshold=covenant_threshold,
-            timelock_blocks=timelock_blocks,
-            unbonding_time=unbonding_time,
-            network=args.network,
-        )
-    except Exception as e:
-        print(f"❌ Error computing Taproot address: {e}")
-        sys.exit(1)
 
     print("Computed staking address:")
-    print('\033[1m' + address + '\033[0m')
+    print('\033[1m' + result["address"] + '\033[0m')
     print()
 
-    if args.debug:
-        print("🔧 DEBUG INFORMATION")
+    if args.debug and "debug" in result:
+        print("DEBUG INFORMATION")
         print("-" * 30)
-        for k, v in debug.items():
+        for k, v in result["debug"].items():
             print(f"{k}: {v}")
         print()
 
