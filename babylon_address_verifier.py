@@ -311,18 +311,41 @@ def compute_taproot_address_and_pkscript(
     pkscript = bytes([0x51, 0x20]) + output_key_x  # OP_1 PUSH32 <xonly>
 
     debug = {
+        # Input parameters
+        "staker_pubkey": xonly(staker_pubkey).hex(),
+        "finality_provider_pubkeys": [xonly(pk).hex() for pk in finality_provider_pubkeys],
+        "covenant_pubkeys": [xonly(pk).hex() for pk in covenant_pubkeys],
+        "covenant_threshold": covenant_threshold,
+        "timelock_blocks": timelock_blocks,
+        "unbonding_time": unbonding_time,
+        "network": network,
+        
+        # Taproot construction
         "internal_key": internal_key.hex(),
+        "tree_structure": "((timelock, unbonding), slashing)",
+        
+        # Script details
         "timelock_script": bytes(timelock_script).hex(),
+        "timelock_script_length": len(bytes(timelock_script)),
         "unbonding_script": bytes(unbonding_script).hex(),
+        "unbonding_script_length": len(bytes(unbonding_script)),
         "slashing_script": bytes(slashing_script).hex(),
+        "slashing_script_length": len(bytes(slashing_script)),
+        
+        # TapLeaf hashes
         "timelock_leaf_hash": tl_leaf.hex(),
         "unbonding_leaf_hash": ub_leaf.hex(),
         "slashing_leaf_hash": sl_leaf.hex(),
+        
+        # Merkle tree construction
+        "branch1_hash": branch1.hex(),
         "merkle_root": merkle_root.hex(),
+        
+        # Final computation
         "tweak": tweak.hex(),
         "output_key_xonly": output_key_x.hex(),
         "staking_output_pkscript_hex": pkscript.hex(),
-        "tree_structure": "((timelock, unbonding), slashing)",
+        "final_address": address,
     }
     return address, pkscript, debug
 

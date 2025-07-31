@@ -153,18 +153,47 @@ HTML_TEMPLATE = """
         .example strong {
             color: #1976d2;
         }
+        .advanced-section {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        .advanced-header {
+            background-color: #f8f9fa;
+            padding: 15px;
+            cursor: pointer;
+            user-select: none;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            color: #555;
+        }
+        .advanced-header:hover {
+            background-color: #e9ecef;
+        }
+        .advanced-content {
+            padding: 20px;
+            display: none;
+        }
+        .advanced-content.expanded {
+            display: block;
+        }
+        .chevron {
+            transition: transform 0.2s;
+            font-size: 14px;
+        }
+        .chevron.rotated {
+            transform: rotate(180deg);
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>Babylon Address Verifier</h1>
         
-        <div class="example">
-            <strong>Example values:</strong><br>
-            Staker PubKey: <code>8a762ca4ab2a314e79dbf0e81ed5efa2483f0f52664a4da42ea125b7ed98f4b1</code><br>
-            Finality Providers: <code>be2f7942c5dfaa826aec61355ef427fad1095491aa04850c450f812f9b9ca9ed</code><br>
-        </div>
-
         <form id="verifierForm">
             <div class="form-group">
                 <label for="stakerPubkey">Staker Public Key *</label>
@@ -178,50 +207,58 @@ HTML_TEMPLATE = """
                           placeholder="Comma-separated hex strings" required></textarea>
             </div>
 
-            <div class="form-group">
-                <label for="network">Network</label>
-                <select id="network" name="network">
-                    <option value="mainnet">Mainnet</option>
-                    <option value="testnet">Testnet</option>
-                    <option value="signet">Signet</option>
-                </select>
-            </div>
+            <div class="advanced-section">
+                <div class="advanced-header" onclick="toggleAdvanced()">
+                    <span>Advanced Options</span>
+                    <span class="chevron">▼</span>
+                </div>
+                <div class="advanced-content" id="advancedContent">
+                    <div class="form-group">
+                        <label for="network">Network</label>
+                        <select id="network" name="network">
+                            <option value="mainnet">Mainnet</option>
+                            <option value="testnet">Testnet</option>
+                            <option value="signet">Signet</option>
+                        </select>
+                    </div>
 
-            <div class="form-group">
-                <label for="block">Block Height <span class="optional">(optional, for mainnet)</span></label>
-                <input type="number" id="block" name="block" 
-                       placeholder="Bitcoin block height">
-            </div>
+                    <div class="form-group">
+                        <label for="block">Block Height <span class="optional">(optional, for mainnet)</span></label>
+                        <input type="number" id="block" name="block" 
+                               placeholder="Bitcoin block height">
+                    </div>
 
-            <div class="form-group">
-                <label for="timelock">Timelock Blocks <span class="optional">(optional override)</span></label>
-                <input type="number" id="timelock" name="timelock" 
-                       placeholder="Staking period in blocks">
-            </div>
+                    <div class="form-group">
+                        <label for="timelock">Timelock Blocks <span class="optional">(optional override)</span></label>
+                        <input type="number" id="timelock" name="timelock" 
+                               placeholder="Staking period in blocks">
+                    </div>
 
-            <div class="form-group">
-                <label for="unbondingTime">Unbonding Time <span class="optional">(optional override)</span></label>
-                <input type="number" id="unbondingTime" name="unbondingTime" 
-                       placeholder="Unbonding period in blocks">
-            </div>
+                    <div class="form-group">
+                        <label for="unbondingTime">Unbonding Time <span class="optional">(optional override)</span></label>
+                        <input type="number" id="unbondingTime" name="unbondingTime" 
+                               placeholder="Unbonding period in blocks">
+                    </div>
 
-            <div class="form-group">
-                <label for="covenantPubkeys">Covenant Public Keys <span class="optional">(optional override)</span></label>
-                <textarea id="covenantPubkeys" name="covenantPubkeys" rows="2"
-                          placeholder="Comma-separated hex strings"></textarea>
-            </div>
+                    <div class="form-group">
+                        <label for="covenantPubkeys">Covenant Public Keys <span class="optional">(optional override)</span></label>
+                        <textarea id="covenantPubkeys" name="covenantPubkeys" rows="2"
+                                  placeholder="Comma-separated hex strings"></textarea>
+                    </div>
 
-            <div class="form-group">
-                <label for="covenantThreshold">Covenant Threshold <span class="optional">(optional override)</span></label>
-                <input type="number" id="covenantThreshold" name="covenantThreshold" 
-                       placeholder="Number of covenant signatures required">
-            </div>
+                    <div class="form-group">
+                        <label for="covenantThreshold">Covenant Threshold <span class="optional">(optional override)</span></label>
+                        <input type="number" id="covenantThreshold" name="covenantThreshold" 
+                               placeholder="Number of covenant signatures required">
+                    </div>
 
-            <div class="form-group">
-                <label>
-                    <input type="checkbox" id="debug" name="debug"> 
-                    Show debug information
-                </label>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="debug" name="debug"> 
+                            Show debug information
+                        </label>
+                    </div>
+                </div>
             </div>
 
             <div class="button-group">
@@ -234,6 +271,14 @@ HTML_TEMPLATE = """
     </div>
 
     <script>
+        function toggleAdvanced() {
+            const content = document.getElementById('advancedContent');
+            const chevron = document.querySelector('.chevron');
+            
+            content.classList.toggle('expanded');
+            chevron.classList.toggle('rotated');
+        }
+
         function clearForm() {
             document.getElementById('verifierForm').reset();
             document.getElementById('result').innerHTML = '';
@@ -292,16 +337,6 @@ HTML_TEMPLATE = """
                             <strong>✅ Success!</strong>
                             <div class="address">${result.address}</div>
                     `;
-                    
-                    if (result.api_meta) {
-                        html += `
-                            <div style="margin-top: 15px; font-size: 14px;">
-                                <strong>Mainnet Parameters:</strong><br>
-                                BTC Activation Height: ${result.api_meta.btc_activation_height}<br>
-                                Staking Time: ${result.api_meta.min_staking_time_blocks} - ${result.api_meta.max_staking_time_blocks} blocks
-                            </div>
-                        `;
-                    }
                     
                     if (result.debug) {
                         html += `
