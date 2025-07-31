@@ -240,6 +240,11 @@ def secp256k1_point_add(point_xonly: bytes, tweak32: bytes) -> bytes:
         y = pow(y2, (p + 1) // 4, p)
         if y & 1:
             y = p - y
+        
+        # Convert to regular int to avoid gmpy2.mpz issues
+        x = int(x)
+        y = int(y)
+        
         pub_uncompressed = b"\x04" + x.to_bytes(32, "big") + y.to_bytes(32, "big")
         pub = secp256k1.PublicKey(pub_uncompressed, raw=True)
         tweaked = pub.tweak_add(tweak32)
@@ -253,11 +258,19 @@ def secp256k1_point_add(point_xonly: bytes, tweak32: bytes) -> bytes:
         y = pow(y2, (p + 1) // 4, p)
         if y & 1:
             y = p - y
+        
+        # Convert to regular int to avoid gmpy2.mpz issues
+        x = int(x)
+        y = int(y)
+        
         curve = SECP256k1.generator.curve()
         P = ellipticcurve.Point(curve, x, y)
         t = int.from_bytes(tweak32, "big")
         R = P + t * SECP256k1.generator
-        return R.x().to_bytes(32, "big")
+        
+        # Ensure R.x() is a regular int
+        result_x = int(R.x())
+        return result_x.to_bytes(32, "big")
 
 # ------------------------------------------------------------------------------
 # Taproot address & scriptPubKey
