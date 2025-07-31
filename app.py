@@ -162,7 +162,7 @@ HTML_TEMPLATE = """
         <div class="example">
             <strong>Example values:</strong><br>
             Staker PubKey: <code>8a762ca4ab2a314e79dbf0e81ed5efa2483f0f52664a4da42ea125b7ed98f4b1</code><br>
-            Finality Providers: <code>fa7496f63a857d894aa393767325bf6f84560e9141f4ec54496c50f546f48bfb</code><br>
+            Finality Providers: <code>be2f7942c5dfaa826aec61355ef427fad1095491aa04850c450f812f9b9ca9ed</code><br>
             Block: <code>903538</code>
         </div>
 
@@ -242,8 +242,7 @@ HTML_TEMPLATE = """
 
         function loadExample() {
             document.getElementById('stakerPubkey').value = '8a762ca4ab2a314e79dbf0e81ed5efa2483f0f52664a4da42ea125b7ed98f4b1';
-            document.getElementById('finalityProviders').value = 'fa7496f63a857d894aa393767325bf6f84560e9141f4ec54496c50f546f48bfb';
-            document.getElementById('block').value = '903538';
+            document.getElementById('finalityProviders').value = 'be2f7942c5dfaa826aec61355ef427fad1095491aa04850c450f812f9b9ca9ed';
             document.getElementById('network').value = 'mainnet';
         }
 
